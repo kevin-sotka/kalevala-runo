@@ -71,6 +71,11 @@ var PlayerController = {
     var W = scene.scale.width;
     var H = scene.scale.height;
 
+    // Multi-touch: Phaser defaults to a single touch pointer, which makes
+    // hold-to-move + tap-to-jump impossible on a phone. Add pointers so a
+    // movement zone and the jump button can be pressed at the same time.
+    scene.input.addPointer(2);
+
     // Left zone (left third of screen)
     var leftZone = scene.add.zone(0, H / 2, W / 3, H).setOrigin(0, 0.5);
     leftZone.setScrollFactor(0);

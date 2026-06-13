@@ -2,22 +2,99 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>Runo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Runo — Songs of the Kalevala</title>
+
+  <meta name="description" content="A dark, cinematic side-scroller through Finland's national epic, the Kalevala.">
+  <meta name="theme-color" content="#0a0a12">
+
+  <!-- Favicons -->
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+  <link rel="icon" href="favicon-32.png">
+
+  <!-- iOS web app (Add to Home Screen) -->
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Runo">
+  <meta name="mobile-web-app-capable" content="yes">
+
+  <!-- Android / PWA -->
+  <link rel="manifest" href="manifest.webmanifest">
+
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
       width: 100%; height: 100%;
       background: #0a0a12;
       overflow: hidden;
+      overscroll-behavior: none;          /* kill pull-to-refresh / bounce */
+      touch-action: none;                 /* no browser pan/zoom on touch */
+      -webkit-tap-highlight-color: transparent;
+      -webkit-user-select: none; user-select: none;
+      -webkit-touch-callout: none;
       display: flex;
       align-items: center;
       justify-content: center;
     }
-    canvas { display: block; }
+    canvas { display: block; touch-action: none; }
+
+    /* "Rotate your device" gate — only on touch devices held in portrait.
+       Pure CSS so it tracks orientation changes with no JS. */
+    #rotate-gate {
+      display: none;
+      position: fixed; inset: 0;
+      z-index: 9999;
+      background: #0a0a12;
+      color: #8a97a8;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: max(24px, env(safe-area-inset-top)) 24px max(24px, env(safe-area-inset-bottom));
+      font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif;
+    }
+    @media (orientation: portrait) and (pointer: coarse) {
+      #rotate-gate { display: flex; }
+    }
+    #rotate-gate img {
+      width: 92px; height: 92px;
+      border-radius: 20px;
+      margin-bottom: 28px;
+      box-shadow: 0 0 40px rgba(196, 160, 64, 0.18);
+    }
+    #rotate-gate .glyph {
+      font-size: 38px;
+      margin-bottom: 18px;
+      color: #c4a040;
+      animation: rock 2.4s ease-in-out infinite;
+    }
+    #rotate-gate h1 {
+      font-size: 22px; font-weight: 400;
+      letter-spacing: 1px;
+      color: #c0c8d8;
+      margin-bottom: 10px;
+    }
+    #rotate-gate p {
+      font-size: 15px; line-height: 1.5;
+      max-width: 320px;
+      color: #5f6e80;
+    }
+    @keyframes rock {
+      0%, 100% { transform: rotate(-12deg); }
+      50%      { transform: rotate(78deg); }
+    }
   </style>
 </head>
 <body>
+  <div id="rotate-gate" aria-hidden="true">
+    <img src="apple-touch-icon.png" alt="Runo">
+    <div class="glyph">⟳</div>
+    <h1>Turn your device sideways</h1>
+    <p>Runo is played in landscape — rotate to the horizon and begin the song.</p>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/textures.js"></script>
