@@ -67,6 +67,11 @@ async function play(page, ep) {
         panel: StoryPanel.isActive(), ready: StoryPanel._ready, fin: sc._finaleTriggered,
         lit: sc._runes.filter(r => r.triggered).length, total: sc._runes.length,
         duel: d ? { phase: d.phase, seq: d.seq, pos: d.pos } : null,
+        // Is there ground just ahead at about our height? If not, jump the gap.
+        edge: PlayerController.isGrounded && !PlayerController.isSwimming && !sc._groundGroup.getChildren().some(b => {
+          const bb = b.body, ax = PlayerController.sprite.x + 34, foot = PlayerController.sprite.body.bottom;
+          return ax >= bb.left && ax <= bb.right && bb.top >= foot - 70 && bb.top <= foot + 60;
+        }),
         crank: sc._sampoActive && !sc._sampoComplete && Math.abs(PlayerController.sprite.x - sc._forgeX) < 200
       };
     }, ep);
@@ -89,16 +94,17 @@ async function play(page, ep) {
     if (NUDGE[ep] && await page.evaluate(NUDGE[ep])) { await page.waitForTimeout(250); continue; }
     if (!right) { await page.keyboard.down('ArrowRight'); right = true; }
     stuck = (Math.abs(s.x - lastX) < 4 && !s.frozen) ? stuck + 1 : 0;
-    if (stuck >= 1 || (s.swim && t % 3 === 0)) {
+    if (stuck >= 1 || s.edge || (s.swim && t % 3 === 0)) {
       await page.keyboard.down('Space');
-      await page.waitForTimeout(stuck > 3 ? 450 : 250);
+      await page.waitForTimeout(stuck > 3 || s.edge ? 450 : 250);
       await page.keyboard.up('Space');
     }
     lastX = s.x;
     await page.waitForTimeout(200);
   }
-  const lit = await page.evaluate(n => RunoGame.scene.getScene('Episode' + n + 'Scene')._runes.filter(r => r.triggered).length, ep);
-  return { ok: false, lit };
+  const end = await page.evaluate(n => { const sc = RunoGame.scene.getScene('Episode' + n + 'Scene');
+    return { lit: sc._runes.filter(r => r.triggered).length, x: PlayerController.sprite.x | 0 }; }, ep);
+  return { ok: false, lit: end.lit, x: end.x };
 }
 
 const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
@@ -114,7 +120,7 @@ for (const ep of episodes) {
   const r = await play(page, ep);
   const ok = r.ok && !errors.length;
   failed = failed || !ok;
-  console.log(`Episode ${ep}: ${ok ? 'PASS' : 'FAIL'}  runes lit ${r.lit}${r.total ? '/' + r.total : ''}` +
+  console.log(`Episode ${ep}: ${ok ? 'PASS' : 'FAIL'}  runes lit ${r.lit}${r.total ? '/' + r.total : ''}${r.x ? '  stopped at x=' + r.x : ''}` +
     (errors.length ? `\n  errors:\n  ${errors.join('\n  ')}` : ''));
   await page.close();
 }
