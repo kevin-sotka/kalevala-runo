@@ -1,0 +1,14 @@
+{
+  "name": "kalevala-runo",
+  "private": true,
+  "description": "Runo: Songs of the Kalevala. Static game; these dev dependencies are only for the headless playtest.",
+  "type": "module",
+  "scripts": {
+    "serve": "python3 -m http.server 8765",
+    "playtest": "node tools/playtest.mjs"
+  },
+  "devDependencies": {
+    "phaser": "3.80.1",
+    "playwright": "1.56.1"
+  }
+}

@@ -22,6 +22,7 @@ var BootScene = new Phaser.Class({
     this._generateSampo(g);
     this._generateParticles(g);
     this._generateMisc(g);
+    this._generateKalevala(g);
 
     g.destroy();
 
@@ -534,5 +535,70 @@ var BootScene = new Phaser.Class({
     rtAnvil.draw(g, 0, 0);
     rtAnvil.saveTexture('anvil');
     rtAnvil.destroy();
+  },
+
+  // ── Textures for Runos III–V: snow, embers, ash, pearls, song glyphs ─
+  _generateKalevala: function (g) {
+    var self = this;
+    function save(key, w, h, draw) {
+      var rt = self.add.renderTexture(0, 0, w, h);
+      g.clear();
+      draw();
+      rt.draw(g, 0, 0);
+      rt.saveTexture(key);
+      rt.destroy();
+    }
+
+    save('particle_snow', 6, 6, function () {
+      g.fillStyle(0xdde6f0, 0.35); g.fillCircle(3, 3, 3);
+      g.fillStyle(0xf4f8ff, 0.9); g.fillCircle(3, 3, 1.5);
+    });
+    save('particle_ember', 6, 6, function () {
+      g.fillStyle(0xff5a1a, 0.4); g.fillCircle(3, 3, 3);
+      g.fillStyle(0xffb040, 1); g.fillCircle(3, 3, 1.5);
+    });
+    save('particle_ash', 5, 5, function () {
+      g.fillStyle(0x6a6a70, 0.8); g.fillCircle(2.5, 2.5, 2);
+    });
+    save('particle_pearl', 10, 10, function () {
+      g.fillStyle(0x6090c0, 0.35); g.fillCircle(5, 5, 5);
+      g.fillStyle(0xa8d0f0, 1); g.fillCircle(5, 5, 3);
+      g.fillStyle(0xffffff, 0.9); g.fillCircle(4, 4, 1);
+    });
+
+    // Four song glyphs for the singing contest. Each is a rune stone with a
+    // different carved sign: the four winds / four arrow keys.
+    var glyphs = [
+      // 0 ← : "Tuuli" — branch to the left
+      function (cx, cy) {
+        g.beginPath(); g.moveTo(cx + 6, cy - 14); g.lineTo(cx + 6, cy + 14); g.strokePath();
+        g.beginPath(); g.moveTo(cx + 6, cy - 6); g.lineTo(cx - 10, cy); g.lineTo(cx + 6, cy + 6); g.strokePath();
+      },
+      // 1 ↑ : "Taivas" — the sky arrow (Tiwaz-like)
+      function (cx, cy) {
+        g.beginPath(); g.moveTo(cx, cy - 14); g.lineTo(cx, cy + 14); g.strokePath();
+        g.beginPath(); g.moveTo(cx - 10, cy - 3); g.lineTo(cx, cy - 14); g.lineTo(cx + 10, cy - 3); g.strokePath();
+      },
+      // 2 → : "Vesi" — branch to the right
+      function (cx, cy) {
+        g.beginPath(); g.moveTo(cx - 6, cy - 14); g.lineTo(cx - 6, cy + 14); g.strokePath();
+        g.beginPath(); g.moveTo(cx - 6, cy - 6); g.lineTo(cx + 10, cy); g.lineTo(cx - 6, cy + 6); g.strokePath();
+      },
+      // 3 ↓ : "Maa" — the earth root (Algiz reversed)
+      function (cx, cy) {
+        g.beginPath(); g.moveTo(cx, cy - 14); g.lineTo(cx, cy + 14); g.strokePath();
+        g.beginPath(); g.moveTo(cx - 10, cy + 3); g.lineTo(cx, cy + 14); g.lineTo(cx + 10, cy + 3); g.strokePath();
+      }
+    ];
+    glyphs.forEach(function (draw, i) {
+      [['dim', 0x1a1a22, 0x4a3a18, 0x6a5a30], ['lit', 0x221c10, 0xe8c040, 0xfff0a0]].forEach(function (v) {
+        save('glyph_' + i + '_' + v[0], 56, 56, function () {
+          g.fillStyle(v[1], 1); g.fillCircle(28, 28, 26);
+          g.lineStyle(2, v[2], 0.9); g.strokeCircle(28, 28, 25);
+          g.lineStyle(3, v[3], 1);
+          draw(28, 28);
+        });
+      });
+    });
   }
 });

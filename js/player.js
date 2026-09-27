@@ -1,68 +1,99 @@
-// player.js — Shared PlayerController: walk, jump, float-swim, respawn, stick figure animation
+// player.js — Shared PlayerController: walk, jump, swim, freeze, touch controls
+//
+// Feel notes
+// - Frozen (a verse is being read, a cutscene is playing): input is ignored and
+//   the Wanderer stops where they stand. Gravity and water still apply, so
+//   nobody slides off a log while reading.
+// - Jumping has coyote time (a moment of grace after walking off a ledge),
+//   a jump buffer (pressing just before landing still jumps) and variable
+//   height (let go early for a short hop).
+// - Water is buoyant. The Wanderer floats with head and shoulders above the
+//   surface, bobs with the waves, can kick up out of the water from the
+//   surface, and holding down dives a little. Nobody drowns.
+// - All damping is frame-rate independent.
 
 var PlayerController = {
+  WALK_SPEED: 165,
+  SWIM_SPEED: 115,
+  JUMP_VEL: -520,
+  SWIM_KICK_VEL: -440,
+  BODY_GRAVITY: 600,      // added to the world's 500 → 1100 total
+  MAX_FALL: 720,
+  FLOAT_DEPTH: 30,        // how far the feet hang below the surface
+  COYOTE_TIME: 0.10,
+  JUMP_BUFFER: 0.13,
+
   sprite: null,
   scene: null,
   cursors: null,
   wasd: null,
   jumpKey: null,
-  enterKey: null,
 
   // State
+  frozen: false,
   isSwimming: false,
   isGrounded: false,
+  traction: 1,            // < 1 on ice
+  water: null,            // { surfaceAt: fn(x) → y|null, currentAt: fn(x) → vx }
   lastCheckpointX: 200,
   lastCheckpointY: 400,
   walkFrame: 0,
   walkTimer: 0,
-  walkInterval: 140,
   dustTimer: 0,
-  dustInterval: 200,
   facingRight: true,
   isMobile: false,
   touchLeft: false,
   touchRight: false,
   touchJump: false,
-  jumpPressed: false,
-  prevGrounded: false,
+  _coyote: 0,
+  _buffer: 0,
+  _jumpHeldPrev: false,
+  _jumping: false,
+  _wasInWater: false,
+  _touchJumpTap: false,
 
   init: function (scene, x, y) {
-    PlayerController.scene = scene;
-    PlayerController.isSwimming = false;
-    PlayerController.walkFrame = 0;
-    PlayerController.walkTimer = 0;
-    PlayerController.dustTimer = 0;
-    PlayerController.facingRight = true;
-    PlayerController.touchLeft = false;
-    PlayerController.touchRight = false;
-    PlayerController.touchJump = false;
-    PlayerController.jumpPressed = false;
-    PlayerController.prevGrounded = false;
+    var P = PlayerController;
+    P.scene = scene;
+    P.frozen = false;
+    P.isSwimming = false;
+    P.isGrounded = false;
+    P.traction = 1;
+    P.water = null;
+    P.walkFrame = 0;
+    P.walkTimer = 0;
+    P.dustTimer = 0;
+    P.facingRight = true;
+    P.touchLeft = false;
+    P.touchRight = false;
+    P.touchJump = false;
+    P._coyote = 0;
+    P._buffer = 0;
+    P._jumpHeldPrev = false;
+    P._jumping = false;
+    P._wasInWater = false;
+    P._touchJumpTap = false;
 
-    // Create physics sprite using player_stand texture
     var sprite = scene.physics.add.sprite(x, y, 'player_stand');
     sprite.setCollideWorldBounds(false);
-    sprite.setGravityY(0); // we control gravity
-    sprite.body.setSize(16, 36);
-    sprite.body.setOffset(4, 3);
+    sprite.body.setGravityY(P.BODY_GRAVITY);
+    sprite.body.setMaxVelocityY(P.MAX_FALL);
+    sprite.body.setSize(14, 36);
+    sprite.body.setOffset(5, 3);
     sprite.setDepth(10);
-    PlayerController.sprite = sprite;
+    P.sprite = sprite;
 
-    // Keyboard
-    PlayerController.cursors = scene.input.keyboard.createCursorKeys();
-    PlayerController.wasd = scene.input.keyboard.addKeys({
+    P.cursors = scene.input.keyboard.createCursorKeys();
+    P.wasd = scene.input.keyboard.addKeys({
       up: Phaser.Input.Keyboard.KeyCodes.W,
       down: Phaser.Input.Keyboard.KeyCodes.S,
       left: Phaser.Input.Keyboard.KeyCodes.A,
       right: Phaser.Input.Keyboard.KeyCodes.D
     });
-    PlayerController.jumpKey = scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-    PlayerController.enterKey = scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+    P.jumpKey = scene.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
 
-    // Detect mobile
-    PlayerController.isMobile = !scene.sys.game.device.os.desktop;
-
-    PlayerController.setupTouchControls(scene);
+    P.isMobile = !scene.sys.game.device.os.desktop;
+    P.setupTouchControls(scene);
 
     return sprite;
   },
@@ -71,68 +102,48 @@ var PlayerController = {
     var W = scene.scale.width;
     var H = scene.scale.height;
 
-    // Multi-touch: Phaser defaults to a single touch pointer, which makes
-    // hold-to-move + tap-to-jump impossible on a phone. Add pointers so a
-    // movement zone and the jump button can be pressed at the same time.
+    // Multi-touch so a movement zone and the jump button can be held together.
     scene.input.addPointer(2);
 
-    // Left zone (left third of screen)
-    var leftZone = scene.add.zone(0, H / 2, W / 3, H).setOrigin(0, 0.5);
-    leftZone.setScrollFactor(0);
-    leftZone.setDepth(50);
-    leftZone.setInteractive();
-    leftZone.on('pointerdown', function () { PlayerController.touchLeft = true; });
-    leftZone.on('pointerup', function () { PlayerController.touchLeft = false; });
-    leftZone.on('pointerout', function () { PlayerController.touchLeft = false; });
+    var makeZone = function (x, flag) {
+      var z = scene.add.zone(x, H / 2, W / 3, H).setOrigin(0, 0.5);
+      z.setScrollFactor(0);
+      z.setDepth(50);
+      z.setInteractive();
+      z.on('pointerdown', function () { PlayerController[flag] = true; });
+      z.on('pointerup', function () { PlayerController[flag] = false; });
+      z.on('pointerout', function () { PlayerController[flag] = false; });
+      return z;
+    };
+    makeZone(0, 'touchLeft');
+    makeZone(W / 3, 'touchRight');
 
-    // Right zone (middle third)
-    var rightZone = scene.add.zone(W / 3, H / 2, W / 3, H).setOrigin(0, 0.5);
-    rightZone.setScrollFactor(0);
-    rightZone.setDepth(50);
-    rightZone.setInteractive();
-    rightZone.on('pointerdown', function () { PlayerController.touchRight = true; });
-    rightZone.on('pointerup', function () { PlayerController.touchRight = false; });
-    rightZone.on('pointerout', function () { PlayerController.touchRight = false; });
+    if (PlayerController.isMobile) {
+      var hints = scene.add.graphics();
+      hints.setScrollFactor(0);
+      hints.setDepth(49);
+      hints.lineStyle(1, 0x405060, 0.35);
+      var lx = W / 6, rx = W / 3 + W / 6, ay = H - 50;
+      hints.beginPath();
+      hints.moveTo(lx + 12, ay - 8); hints.lineTo(lx - 4, ay); hints.lineTo(lx + 12, ay + 8);
+      hints.strokePath();
+      hints.beginPath();
+      hints.moveTo(rx - 12, ay - 8); hints.lineTo(rx + 4, ay); hints.lineTo(rx - 12, ay + 8);
+      hints.strokePath();
+    }
 
-    // Left zone outline (faint)
-    var lOutline = scene.add.graphics();
-    lOutline.lineStyle(1, 0x304050, 0.25);
-    lOutline.strokeRect(4, H / 2 - H / 3, W / 3 - 8, H * 2 / 3 - 8);
-    lOutline.setScrollFactor(0);
-    lOutline.setDepth(49);
-    // Arrow left hint
-    lOutline.lineStyle(1, 0x405060, 0.3);
-    var lx = W / 6, ly = H - 50;
-    lOutline.beginPath();
-    lOutline.moveTo(lx + 12, ly - 8);
-    lOutline.lineTo(lx - 4, ly);
-    lOutline.lineTo(lx + 12, ly + 8);
-    lOutline.strokePath();
-
-    // Right zone outline
-    var rOutline = scene.add.graphics();
-    rOutline.lineStyle(1, 0x304050, 0.25);
-    rOutline.strokeRect(W / 3 + 4, H / 2 - H / 3, W / 3 - 8, H * 2 / 3 - 8);
-    rOutline.setScrollFactor(0);
-    rOutline.setDepth(49);
-    // Arrow right hint
-    rOutline.lineStyle(1, 0x405060, 0.3);
-    var rx = W / 3 + W / 6, ry = H - 50;
-    rOutline.beginPath();
-    rOutline.moveTo(rx - 12, ry - 8);
-    rOutline.lineTo(rx + 4, ry);
-    rOutline.lineTo(rx - 12, ry + 8);
-    rOutline.strokePath();
-
-    // Jump button (bottom-right)
     var jumpBtn = scene.add.image(W - 60, H - 60, 'jump_btn');
     jumpBtn.setScrollFactor(0);
     jumpBtn.setDepth(51);
-    jumpBtn.setScale(1.0);
+    jumpBtn.setAlpha(PlayerController.isMobile ? 1 : 0.35);
     jumpBtn.setInteractive();
-    jumpBtn.on('pointerdown', function () { PlayerController.touchJump = true; });
+    jumpBtn.on('pointerdown', function () {
+      PlayerController.touchJump = true;
+      PlayerController._touchJumpTap = true;
+    });
     jumpBtn.on('pointerup', function () { PlayerController.touchJump = false; });
     jumpBtn.on('pointerout', function () { PlayerController.touchJump = false; });
+    PlayerController.jumpBtn = jumpBtn;
   },
 
   setCheckpoint: function (x, y) {
@@ -140,91 +151,158 @@ var PlayerController = {
     PlayerController.lastCheckpointY = y;
   },
 
-  setSwimMode: function (swimming) {
-    PlayerController.isSwimming = swimming;
+  setFrozen: function (frozen) {
+    PlayerController.frozen = !!frozen;
   },
 
-  update: function (delta, groundGroup) {
-    var sprite = PlayerController.sprite;
-    if (!sprite || !sprite.active) return;
+  // Water description for this scene, or null for dry land everywhere.
+  setWater: function (water) {
+    PlayerController.water = water;
+  },
 
-    var scene = PlayerController.scene;
-    var cursors = PlayerController.cursors;
-    var wasd = PlayerController.wasd;
-    var speed = 160;
-    var jumpVel = PlayerController.isSwimming ? -180 : -400;
-    var gravity = PlayerController.isSwimming ? 40 : 500;
+  // Kept for older callers: swimming is now decided by the water itself.
+  setSwimMode: function () {},
 
-    // Apply gravity manually (since we use sprite.setGravityY = 0 for control)
-    if (!sprite.body.blocked.down) {
-      sprite.body.setGravityY(gravity);
-    } else {
-      sprite.body.setGravityY(gravity);
-    }
+  input: function () {
+    var P = PlayerController;
+    var c = P.cursors, w = P.wasd;
+    return {
+      left: c.left.isDown || w.left.isDown || P.touchLeft,
+      right: c.right.isDown || w.right.isDown || P.touchRight,
+      down: c.down.isDown || w.down.isDown,
+      jump: c.up.isDown || w.up.isDown || P.jumpKey.isDown || P.touchJump
+    };
+  },
 
-    var left = cursors.left.isDown || wasd.left.isDown || PlayerController.touchLeft;
-    var right = cursors.right.isDown || wasd.right.isDown || PlayerController.touchRight;
-    var jumpDown = cursors.up.isDown || wasd.up.isDown || PlayerController.jumpKey.isDown || PlayerController.touchJump;
+  update: function (delta) {
+    var P = PlayerController;
+    var sprite = P.sprite;
+    if (!sprite || !sprite.active || !sprite.body) return;
+    var body = sprite.body;
+    var dt = Math.min(delta, 50) / 1000;
 
-    // Movement
-    if (left) {
-      sprite.setVelocityX(-speed);
-      PlayerController.facingRight = false;
-    } else if (right) {
-      sprite.setVelocityX(speed);
-      PlayerController.facingRight = true;
-    } else {
-      sprite.setVelocityX(0);
-    }
+    var inp = P.frozen ? { left: false, right: false, down: false, jump: false } : P.input();
+    var dir = inp.left ? -1 : (inp.right ? 1 : 0);
+    if (dir !== 0) P.facingRight = dir > 0;
+    sprite.setFlipX(!P.facingRight);
 
-    sprite.setFlipX(!PlayerController.facingRight);
+    var grounded = body.blocked.down || body.touching.down;
+    P.isGrounded = grounded;
 
-    var grounded = sprite.body.blocked.down;
-    PlayerController.isGrounded = grounded;
+    // Jump buffer + coyote time. Edge detection uses JustDown so a quick tap
+    // that goes down and up between two frames still counts. Presses made
+    // while frozen are swallowed so they don't fire after a verse closes.
+    var JD = Phaser.Input.Keyboard.JustDown;
+    var tapped = JD(P.jumpKey) | JD(P.cursors.up) | JD(P.wasd.up);
+    tapped = tapped || P._touchJumpTap;
+    P._touchJumpTap = false;
+    var jumpPressed = !P.frozen && (tapped || (inp.jump && !P._jumpHeldPrev));
+    P._jumpHeldPrev = inp.jump;
+    P._buffer = jumpPressed ? P.JUMP_BUFFER : Math.max(0, P._buffer - dt);
+    P._coyote = grounded ? P.COYOTE_TIME : Math.max(0, P._coyote - dt);
 
-    // Jump / swim-float
-    if (jumpDown && !PlayerController.jumpPressed) {
-      if (grounded || PlayerController.isSwimming) {
-        sprite.setVelocityY(jumpVel);
-        PlayerController.jumpPressed = true;
+    // Water
+    var surf = P.water ? P.water.surfaceAt(sprite.x) : null;
+    var sub = surf === null || surf === undefined ? -999 : body.bottom - surf;
+    var inWater = sub > 4 && !grounded;
+    P.isSwimming = inWater;
+
+    var vx = body.velocity.x;
+    var vy = body.velocity.y;
+
+    if (inWater) {
+      body.setAllowGravity(false);
+      if (!P._wasInWater && vy > 120) P.splash(sprite.x, surf);
+
+      // Spring toward floating depth — this is the buoyancy.
+      var target = P.FLOAT_DEPTH + (inp.down ? 46 : 0);
+      var d = sub - target;
+      vy += (-d * 24 - vy * 5.0) * dt;
+
+      // Kick up out of the water when near the surface
+      if (P._buffer > 0 && Math.abs(d) < 18) {
+        vy = P.SWIM_KICK_VEL;
+        P._buffer = 0;
+        P.splash(sprite.x, surf);
       }
-    }
-    if (!jumpDown) {
-      PlayerController.jumpPressed = false;
-    }
 
-    // Swim: dampen vertical velocity
-    if (PlayerController.isSwimming) {
-      var vy = sprite.body.velocity.y;
-      sprite.setVelocityY(vy * 0.92);
-    }
+      // Swimming into a bank or wall: clamber up and out
+      var pushing = dir > 0 ? body.blocked.right : (dir < 0 ? body.blocked.left : false);
+      if (pushing && !P.frozen) vy = Math.min(vy, -380);
 
-    // Animation frames
-    PlayerController.walkTimer += delta;
-    if (PlayerController.walkTimer >= PlayerController.walkInterval) {
-      PlayerController.walkTimer = 0;
-      if (!grounded) {
+      var current = (P.water.currentAt && !P.frozen) ? P.water.currentAt(sprite.x) : 0;
+      var tvx = dir * P.SWIM_SPEED + current;
+      vx += (tvx - vx) * (1 - Math.exp(-5 * dt));
+      P._jumping = false;
+    } else {
+      body.setAllowGravity(true);
+      var tv = dir * P.WALK_SPEED;
+      var accel, decel;
+      if (grounded) {
+        accel = 1800 * P.traction;
+        decel = 2400 * P.traction;
+      } else {
+        accel = 1200;
+        decel = 700;
+      }
+      if (P.frozen && grounded) {
+        vx = 0;
+      } else {
+        var rate = (dir !== 0 && Math.sign(tv) === Math.sign(vx || tv)) ? accel : decel;
+        if (vx < tv) vx = Math.min(tv, vx + rate * dt);
+        else if (vx > tv) vx = Math.max(tv, vx - rate * dt);
+      }
+
+      if (P._buffer > 0 && P._coyote > 0) {
+        vy = P.JUMP_VEL;
+        P._buffer = 0;
+        P._coyote = 0;
+        P._jumping = true;
+      }
+      // Variable height: releasing early cuts the rise
+      if (P._jumping && !inp.jump && vy < -160) {
+        vy *= 0.45;
+        P._jumping = false;
+      }
+      if (vy >= 0) P._jumping = false;
+    }
+    P._wasInWater = inWater;
+
+    body.setVelocity(vx, vy);
+
+    P._animate(delta, grounded, inWater, vx);
+  },
+
+  _animate: function (delta, grounded, inWater, vx) {
+    var P = PlayerController;
+    var sprite = P.sprite;
+    var moving = Math.abs(vx) > 12;
+    P.walkTimer += delta;
+    var interval = inWater ? 320 : 140;
+    if (P.walkTimer >= interval) {
+      P.walkTimer = 0;
+      if (inWater) {
+        P.walkFrame = (P.walkFrame + 1) % 2;
+        sprite.setTexture(moving ? (P.walkFrame ? 'player_walk1' : 'player_walk2') : 'player_stand');
+      } else if (!grounded) {
         sprite.setTexture('player_jump');
-      } else if (Math.abs(sprite.body.velocity.x) > 10) {
-        PlayerController.walkFrame = (PlayerController.walkFrame + 1) % 2;
-        sprite.setTexture(PlayerController.walkFrame === 0 ? 'player_walk1' : 'player_walk2');
+      } else if (moving) {
+        P.walkFrame = (P.walkFrame + 1) % 2;
+        sprite.setTexture(P.walkFrame === 0 ? 'player_walk1' : 'player_walk2');
       } else {
         sprite.setTexture('player_stand');
       }
     }
 
-    // Footstep dust
-    if (grounded && Math.abs(sprite.body.velocity.x) > 10) {
-      PlayerController.dustTimer += delta;
-      if (PlayerController.dustTimer >= PlayerController.dustInterval) {
-        PlayerController.dustTimer = 0;
-        PlayerController.spawnDust(sprite.x, sprite.y + 18);
+    if (grounded && moving) {
+      P.dustTimer += delta;
+      if (P.dustTimer >= 200) {
+        P.dustTimer = 0;
+        P.spawnDust(sprite.x, sprite.y + 18);
       }
     } else {
-      PlayerController.dustTimer = 0;
+      P.dustTimer = 0;
     }
-
-    PlayerController.prevGrounded = grounded;
   },
 
   spawnDust: function (x, y) {
@@ -236,7 +314,6 @@ var PlayerController = {
         scale: { start: 0.8, end: 0 },
         alpha: { start: 0.6, end: 0 },
         lifespan: 300,
-        quantity: 3,
         frequency: -1
       });
       emitter.setDepth(8);
@@ -245,7 +322,22 @@ var PlayerController = {
     } catch (e) {}
   },
 
-  handleEnterKey: function () {
-    return Phaser.Input.Keyboard.JustDown(PlayerController.enterKey);
+  splash: function (x, y) {
+    try {
+      var scene = PlayerController.scene;
+      var emitter = scene.add.particles(x, y, 'particle_star', {
+        speed: { min: 40, max: 110 },
+        angle: { min: 225, max: 315 },
+        scale: { start: 1.4, end: 0 },
+        alpha: { start: 0.8, end: 0 },
+        gravityY: 300,
+        lifespan: 500,
+        tint: 0x9ab8d0,
+        frequency: -1
+      });
+      emitter.setDepth(11);
+      emitter.explode(10, 0, 0);
+      scene.time.delayedCall(600, function () { emitter.destroy(); });
+    } catch (e) {}
   }
 };

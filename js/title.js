@@ -30,7 +30,7 @@ var TitleScene = new Phaser.Class({
       letterSpacing: 18,
       shadow: { offsetX: 0, offsetY: 2, color: '#000820', fill: true, blur: 8 }
     };
-    var title = this.add.text(W / 2, H * 0.28, 'RUNO', titleStyle);
+    var title = this.add.text(W / 2, H * 0.24, 'RUNO', titleStyle);
     title.setOrigin(0.5, 0.5);
     title.setDepth(10);
 
@@ -40,12 +40,20 @@ var TitleScene = new Phaser.Class({
       color: '#5a6a7a',
       letterSpacing: 6
     };
-    var subtitle = this.add.text(W / 2, H * 0.38, 'Songs of the Kalevala', subtitleStyle);
+    var subtitle = this.add.text(W / 2, H * 0.36, 'Kalevalan lauluja  ·  Songs of the Kalevala', subtitleStyle);
     subtitle.setOrigin(0.5, 0.5);
     subtitle.setDepth(10);
 
     // Episode cards
+    this._launching = false;
     this._buildEpisodeCards(W, H);
+
+    var credit = this.add.text(W / 2, H - 20,
+      'Elias Lönnrotin Kalevala (1849)  ·  L kieli / language  ·  M ääni / sound', {
+        fontFamily: RunoFonts.plain, fontSize: '11px', color: '#34424f', letterSpacing: 2
+      });
+    credit.setOrigin(0.5, 0.5);
+    credit.setDepth(10);
 
     // Mute button
     MuteButton.create(this);
@@ -113,123 +121,84 @@ var TitleScene = new Phaser.Class({
   },
 
   _buildEpisodeCards: function (W, H) {
-    var ep1Complete = this.registry.get('ep1Complete') || false;
-    var cardY = H * 0.65;
-
-    // Episode 1 card
-    var card1 = this._buildCard(W / 2 - 160, cardY, {
-      title: 'I. Birth of Väinämöinen',
-      sub: 'The primordial sea',
-      locked: false,
-      scene: 'Episode1Scene',
-      episode: 1
-    }, W, H);
-
-    // Episode 2 card
-    var card2 = this._buildCard(W / 2 + 160, cardY, {
-      title: 'II. The Sampo',
-      sub: ep1Complete ? 'The great forge' : 'Complete Episode I',
-      locked: !ep1Complete,
-      scene: 'Episode2Scene',
-      episode: 2
-    }, W, H);
-
-    this._card1 = card1;
-    this._card2 = card2;
+    var episodes = [
+      { n: 1, numeral: 'I', fi: 'Väinämöisen synty', en: 'The Birth of Väinämöinen', scene: 'Episode1Scene' },
+      { n: 2, numeral: 'II', fi: 'Sampo', en: 'The Sampo', scene: 'Episode2Scene' },
+      { n: 3, numeral: 'III', fi: 'Laulukilpa', en: 'The Singing Contest', scene: 'Episode3Scene' },
+      { n: 4, numeral: 'IV', fi: 'Kantele', en: 'The Pike-Bone Harp', scene: 'Episode4Scene' },
+      { n: 5, numeral: 'V', fi: 'Kullervo', en: 'Kalervo\'s Son', scene: 'Episode5Scene' }
+    ];
+    var gap = 182;
+    var cardY = H * 0.67;
+    this._cards = episodes.map(function (ep, i) {
+      ep.locked = !RunoSave.isUnlocked(ep.n);
+      ep.done = RunoSave.isComplete(ep.n);
+      return this._buildCard(W / 2 + (i - 2) * gap, cardY, ep);
+    }, this);
   },
 
-  _buildCard: function (cx, cy, config, W, H) {
-    var cardW = 260, cardH = 150;
+  _buildCard: function (cx, cy, config) {
+    var cardW = 170, cardH = 132;
     var container = this.add.container(cx, cy);
     container.setDepth(15);
 
-    // Card background
     var bg = this.add.graphics();
-    bg.fillStyle(0x080c18, 0.88);
-    bg.fillRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 6);
-    bg.lineStyle(1, config.locked ? 0x1a2030 : 0x2a4050, 0.7);
-    bg.strokeRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 6);
+    var draw = function (hover) {
+      bg.clear();
+      bg.fillStyle(hover ? 0x0c1428 : 0x080c18, hover ? 0.95 : 0.88);
+      bg.fillRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 6);
+      bg.lineStyle(hover ? 2 : 1, config.locked ? 0x1a2030 : (hover ? 0x4a7090 : 0x2a4050), hover ? 0.9 : 0.7);
+      bg.strokeRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 6);
+    };
+    draw(false);
     container.add(bg);
 
-    var titleStyle = {
-      fontFamily: "'Iowan Old Style', Georgia, serif",
-      fontSize: '15px',
-      color: config.locked ? '#2a3a4a' : '#8090a8',
-      letterSpacing: 2,
-      wordWrap: { width: cardW - 40 },
-      align: 'center'
-    };
-    var titleTxt = this.add.text(0, -30, config.title, titleStyle);
-    titleTxt.setOrigin(0.5, 0.5);
-    container.add(titleTxt);
+    var dim = config.locked;
+    var numeral = this.add.text(0, -44, config.numeral, {
+      fontFamily: RunoFonts.verse, fontSize: '18px',
+      color: dim ? '#1e2a38' : '#a08850', letterSpacing: 4
+    }).setOrigin(0.5, 0.5);
+    var fi = this.add.text(0, -18, config.fi, {
+      fontFamily: RunoFonts.verse, fontSize: '15px',
+      color: dim ? '#2a3a4a' : '#9aa8c0', letterSpacing: 1,
+      align: 'center', wordWrap: { width: cardW - 20 }
+    }).setOrigin(0.5, 0.5);
+    var en = this.add.text(0, 4, config.en, {
+      fontFamily: RunoFonts.plain, fontSize: '11px',
+      color: dim ? '#1a2a38' : '#4a6070', letterSpacing: 1,
+      align: 'center', wordWrap: { width: cardW - 20 }
+    }).setOrigin(0.5, 0.5);
+    container.add([numeral, fi, en]);
 
-    var subStyle = {
-      fontFamily: "Georgia, serif",
-      fontSize: '12px',
-      color: config.locked ? '#1a2a38' : '#4a6070',
-      letterSpacing: 1,
-      align: 'center'
-    };
-    var subTxt = this.add.text(0, 4, config.sub, subStyle);
-    subTxt.setOrigin(0.5, 0.5);
-    container.add(subTxt);
-
-    if (!config.locked) {
-      // Episode rune icon
-      var runeIcon = this.add.image(0, 38, 'rune_unlit');
-      runeIcon.setScale(0.6);
-      container.add(runeIcon);
-
-      // Hover / click
-      bg.setInteractive(new Phaser.Geom.Rectangle(-cardW / 2, -cardH / 2, cardW, cardH), Phaser.Geom.Rectangle.Contains);
-      bg.on('pointerover', function () {
-        bg.clear();
-        bg.fillStyle(0x0c1428, 0.95);
-        bg.fillRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 6);
-        bg.lineStyle(2, 0x4a7090, 0.9);
-        bg.strokeRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 6);
-        titleTxt.setColor('#c0d0e0');
-      });
-      bg.on('pointerout', function () {
-        bg.clear();
-        bg.fillStyle(0x080c18, 0.88);
-        bg.fillRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 6);
-        bg.lineStyle(1, 0x2a4050, 0.7);
-        bg.strokeRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 6);
-        titleTxt.setColor('#8090a8');
-      });
-
-      var self = this;
-      bg.on('pointerdown', function () {
-        if (!RunoAudio.isStarted()) RunoAudio.start(config.episode);
-        // Fade out and launch scene
-        self.cameras.main.fadeOut(500, 0, 0, 0);
-        self.cameras.main.once('camerafadeoutcomplete', function () {
-          self.scene.start(config.scene);
-        });
-      });
-
-      // Subtle pulse on the rune icon
-      this.tweens.add({
-        targets: runeIcon,
-        alpha: { from: 0.5, to: 1 },
-        duration: 1800,
-        ease: 'Sine.easeInOut',
-        yoyo: true,
-        repeat: -1
-      });
-    } else {
-      // Lock icon
-      var lockStyle = {
-        fontFamily: 'Georgia, serif',
-        fontSize: '22px',
-        color: '#1a2a38'
-      };
-      var lockTxt = this.add.text(0, 38, '⟡', lockStyle);
+    if (dim) {
+      var lockTxt = this.add.text(0, 40, '⟡', { fontFamily: 'Georgia, serif', fontSize: '22px', color: '#1a2a38' });
       lockTxt.setOrigin(0.5, 0.5);
       container.add(lockTxt);
+      return container;
     }
 
+    var runeIcon = this.add.image(0, 40, config.done ? 'rune_lit' : 'rune_unlit');
+    runeIcon.setScale(0.55);
+    container.add(runeIcon);
+    this.tweens.add({
+      targets: runeIcon, alpha: { from: 0.55, to: 1 }, duration: 1800,
+      ease: 'Sine.easeInOut', yoyo: true, repeat: -1
+    });
+
+    bg.setInteractive(new Phaser.Geom.Rectangle(-cardW / 2, -cardH / 2, cardW, cardH), Phaser.Geom.Rectangle.Contains);
+    bg.on('pointerover', function () { draw(true); fi.setColor('#d0dcec'); });
+    bg.on('pointerout', function () { draw(false); fi.setColor('#9aa8c0'); });
+
+    var self = this;
+    bg.on('pointerdown', function () {
+      if (self._launching) return;
+      self._launching = true;
+      if (!RunoAudio.isStarted()) RunoAudio.start(config.n);
+      self.cameras.main.fadeOut(500, 0, 0, 0);
+      self.cameras.main.once('camerafadeoutcomplete', function () {
+        self.scene.start(config.scene);
+      });
+    });
     return container;
   },
 
