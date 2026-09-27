@@ -2,7 +2,7 @@
 
 This plan covers the work to make Runo pleasant to play, and to grow it from two songs into a longer cycle of the Kalevala. It keeps what already works (the painted-in-code look, the ambient drone and stings, the hushed pace) and fixes what fights the player.
 
-Phases 1 to 3 are done on this branch. Phases 4 to 6 are the road ahead, split into tracks that can run in parallel.
+Phases 1 to 4 are done. Phases 5 and 6 are the road ahead, split into tracks that can run in parallel.
 
 ---
 
@@ -66,14 +66,16 @@ Phases 1 to 3 are done on this branch. Phases 4 to 6 are the road ahead, split i
 
 Shared engine work that made this cheap: `js/kit.js` (scene setup, full-height ground, one-way ledges, parallax ridges and forests, aurora, weather, bursts, finale and end card) and a silhouette library (spruce, birch, Scots pine, wolf, bear, elk, horse, cow, dog, squirrel, swan, eagle, pike, boat, sleigh, kantele, log house). Audio gained a Karplus-Strong kantele tuned D E F G A, sung notes for the duel, and stings for fire, sword, howl, sinking.
 
-### Phase 4: Polish (next)
+### Phase 4: Polish (done)
 
-- **Per-song music.** A slow generative kantele line over each drone, in the episode's mode; a quiet runo-singer's call-and-response in III.
-- **Parallax breathing.** The empty `_idleDrift` hook in the old Episode 1 was never filled. Give far layers a tiny sway.
-- **Bake static layers.** Parallax forests are Graphics redrawn every frame. Bake them to textures in tiles no wider than 2048 px for low-end phones.
-- **Footfall sounds** per surface: snow crunch, ice tick, wet stone.
-- **Episode II shore.** The Sampo's escape runs on land; add the sea crossing the verses describe, using the new water.
-- **Aurora** also on the title screen, reusing `EpisodeKit.aurora`.
+| Item | What shipped | Check |
+|---|---|---|
+| Per-song music | A generative kantele line over each drone, one mode per song (title and I in D dorian, II low A minor, III E minor pentatonic, IV the kantele's own D E F G A, V a sparse E phrygian). Short phrases, long rests. In III a sung voice leads each phrase and the kantele answers. The music ducks while you sing the duel (III) and while you play the kantele (IV). | Stand still for 30 s in any song: a few quiet phrases, never a loop |
+| Parallax breathing | Far layers sway a pixel or two on slow, separate rhythms | Stand still: the far fells and forests drift very slightly |
+| Baked layers | Skies, ridges and forests are painted once into textures, cropped to their content, in tiles no wider than 2048 px (at most about 11 MB per song) | Scene has no per-frame Graphics for parallax |
+| Footfalls | Snow crunch, ice tick, wet stone, log wood, earth; a heavier step on landing; splashes on entering water | Walk each surface in III, I and V |
+| Episode II sea | A headland where Louhi's storm begins, then a storm sea with the wind pushing back, rocks to rest on, the heroes' boat with the Sampo on the swell, and the rock where it breaks. The storm darkness now closes only the right third so the sea stays readable. | Cross it; the boat loses its glow when the Sampo shatters |
+| Title aurora | The title uses the same revontulet as song III; the title's own music returns when you come back from a song | |
 
 ### Phase 5: Accessibility and settings (next)
 
@@ -127,6 +129,7 @@ The work splits into tracks that touch different files, so several people or age
 - [ ] Re-read a lit rune with E, and by tapping it.
 - [ ] Cycle FI · EN, EN, FI with L; reload; the choice is kept.
 - [ ] Episode II: hold Space at the Sampo; the smith stays put while it spins.
+- [ ] Episode II: cross the storm sea against the wind; rest on the rocks; climb out onto the Sampo's rock.
 - [ ] Episode III: slide on the ice; fall into an ice-hole and climb out; miss a note in the duel on purpose and see the phrase replay.
 - [ ] Episode IV: the rapids push back before the charm and barely after; build and play the kantele until everyone arrives.
 - [ ] Episode V: fire vents can be passed by waiting; the oak can be climbed; the fire wall can be outrun; Musti follows you.

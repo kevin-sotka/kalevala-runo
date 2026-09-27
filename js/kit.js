@@ -43,6 +43,8 @@ var EpisodeKit = {
       return RuneManager.createRune(scene, v.x, v.y, v);
     });
 
+    EpisodeKit.bakeLayers(scene);
+
     scene.cameras.main.startFollow(player, true, 0.08, 0.08);
     scene.cameras.main.setFollowOffset(-80, 0);
 
@@ -67,6 +69,7 @@ var EpisodeKit = {
       RespawnSystem.respawn(player, PlayerController.lastCheckpointX, PlayerController.lastCheckpointY);
     }
     RuneManager.updateAll(scene, scene._runes, player, delta);
+    EpisodeKit.breathe(scene);
   },
 
   // Solid ground: [x, topY, width]. The body reaches to the bottom of the
@@ -134,12 +137,18 @@ var EpisodeKit = {
     g.setDepth(depth);
     g.fillStyle(color, alpha === undefined ? 1 : alpha);
     var span = (scene.WORLD_W - W) * sf + W + 40;
+    var maxH = 0;
     g.beginPath();
     g.moveTo(-20, H);
-    for (var x = -20; x <= span; x += 12) g.lineTo(x, H - fn(x));
+    for (var x = -20; x <= span; x += 12) {
+      var h = fn(x);
+      if (h > maxH) maxH = h;
+      g.lineTo(x, H - h);
+    }
     g.lineTo(span, H);
     g.closePath();
     g.fillPath();
+    EpisodeKit.layer(scene, g, { top: H - maxH - 4, left: -20, right: span });
     return g;
   },
 
@@ -151,12 +160,83 @@ var EpisodeKit = {
     g.setDepth(depth);
     var span = (scene.WORLD_W - W) * sf + W + 40;
     var gap = opts.gap || 40;
-    for (var x = opts.from || -10; x < (opts.to || span); x += gap * (0.6 + Math.random() * 0.8)) {
+    var from = opts.from || -10, to = opts.to || span;
+    var top = scene.scale.height;
+    for (var x = from; x < to; x += gap * (0.6 + Math.random() * 0.8)) {
       var h = opts.minH + Math.random() * (opts.maxH - opts.minH);
       var kind = opts.kinds ? opts.kinds[Math.floor(Math.random() * opts.kinds.length)] : 'spruce';
-      Silhouettes[kind](g, x, baseFn(x), h, color, opts);
+      var base = baseFn(x);
+      Silhouettes[kind](g, x, base, h, color, opts);
+      top = Math.min(top, base - h * 1.12);
     }
+    EpisodeKit.layer(scene, g, { top: top - 4, left: from - opts.maxH, right: to + 60 });
     return g;
+  },
+
+  // ── Static layers: baked to textures, then left to breathe ──────────
+  // A Graphics object is redrawn (and its shapes re-triangulated) every
+  // frame. Parallax layers never change, so once the scene is built they are
+  // painted into textures, cropped to what they contain and cut into tiles
+  // no wider than 2048 px, which is safe for low-end phones.
+  // bounds: { top, left, right } in the layer's own coordinates.
+  layer: function (scene, g, bounds) {
+    (scene._layers = scene._layers || []).push({ g: g, b: bounds || {} });
+    return g;
+  },
+
+  bakeLayers: function (scene) {
+    var W = scene.scale.width, H = scene.scale.height;
+    var list = scene._layers || [];
+    scene._layers = [];
+    scene._breathing = [];
+    var groups = [], byKey = {};
+    list.forEach(function (it) {
+      var key = it.g.scrollFactorX + '|' + it.g.depth;
+      if (!byKey[key]) { byKey[key] = { sf: it.g.scrollFactorX, depth: it.g.depth, items: [] }; groups.push(byKey[key]); }
+      byKey[key].items.push(it);
+    });
+    groups.forEach(function (grp) {
+      var span = (scene.WORLD_W - W) * grp.sf + W + 40;
+      var top = H, left = Infinity, right = -Infinity;
+      grp.items.forEach(function (it) {
+        top = Math.min(top, it.b.top === undefined ? 0 : it.b.top);
+        left = Math.min(left, it.b.left === undefined ? -40 : it.b.left);
+        right = Math.max(right, it.b.right === undefined ? span : it.b.right);
+      });
+      // Nothing past the layer's farthest visible point is ever seen
+      top = Math.max(0, Math.floor(top));
+      left = Math.max(-60, Math.floor(left) - 4);
+      right = Math.min(span + 60, Math.ceil(right) + 4);
+      var h = H - top;
+      if (h <= 0 || right <= left) return;
+      var anchor = grp.items[0].g;
+      var tiles = [];
+      for (var x0 = left; x0 < right; x0 += 2048) {
+        var w = Math.ceil(Math.min(2048, right - x0));
+        var rt = scene.add.renderTexture(x0, top, w, h);
+        rt.setOrigin(0, 0);
+        grp.items.forEach(function (it) { rt.draw(it.g, -x0, -top); });
+        rt.setScrollFactor(grp.sf);
+        rt.setDepth(grp.depth);
+        try { scene.children.moveAbove(rt, anchor); } catch (e) {}
+        tiles.push(rt);
+      }
+      grp.items.forEach(function (it) { it.g.destroy(); });
+      // Far layers sway a little, so the world breathes while you stand still
+      var amp = grp.sf <= 0 ? 0 : grp.sf <= 0.1 ? 2.4 : grp.sf <= 0.3 ? 1.6 : grp.sf <= 0.5 ? 0.9 : 0;
+      if (amp > 0) {
+        scene._breathing.push({ tiles: tiles, base: tiles.map(function (t) { return t.x; }),
+          amp: amp, speed: 0.00025 + Math.random() * 0.0002, phase: Math.random() * 6.28 });
+      }
+    });
+  },
+
+  breathe: function (scene) {
+    var t = scene.time.now;
+    (scene._breathing || []).forEach(function (b) {
+      var dx = Math.sin(t * b.speed + b.phase) * b.amp;
+      b.tiles.forEach(function (tile, i) { tile.x = b.base[i] + dx; });
+    });
   },
 
   // Aurora borealis — revontulet, "the fox's fires"

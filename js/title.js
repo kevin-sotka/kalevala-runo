@@ -15,8 +15,8 @@ var TitleScene = new Phaser.Class({
     sky.setDisplaySize(W, H);
     sky.setDepth(0);
 
-    // Aurora hint — drawn as faint horizontal gradient bands
-    this._buildAurora(W, H);
+    // Revontulet over the title, the same fox-fires as the winter song
+    EpisodeKit.aurora(this, 1, [0x1e7a5a, 0x1e6478, 0x503878]);
 
     // Parallax layers (star fields at different depths)
     this._parallaxLayers = [];
@@ -74,29 +74,15 @@ var TitleScene = new Phaser.Class({
     // Drift timer
     this._driftT = 0;
 
+    // Back from a song: let the title's own music take over
+    if (RunoAudio.isStarted()) RunoAudio.start(0);
+
     // Handle touch for audio start (any tap on the scene)
     this.input.once('pointerdown', function () {
       if (!RunoAudio.isStarted()) {
         RunoAudio.start(0);
       }
     });
-  },
-
-  _buildAurora: function (W, H) {
-    // Faint aurora bands near top
-    var bands = this.add.graphics();
-    bands.setDepth(1);
-    var auroraColors = [0x0a2030, 0x0a1828, 0x081420];
-    for (var i = 0; i < 3; i++) {
-      bands.fillStyle(auroraColors[i], 0.18 - i * 0.04);
-      var yOff = H * 0.05 + i * 30;
-      // Wavy band using fillRect strips
-      for (var x = 0; x < W; x += 20) {
-        var h = 18 + Math.sin(x * 0.02 + i * 1.2) * 8;
-        bands.fillRect(x, yOff, 20, h);
-      }
-    }
-    this._auroraBands = bands;
   },
 
   _buildStarLayers: function (W, H) {

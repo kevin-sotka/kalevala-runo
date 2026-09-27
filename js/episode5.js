@@ -97,6 +97,7 @@ var Episode5Scene = new Phaser.Class({
       sky.fillStyle(0x000000, 0.5 - (y / H) * 0.5);
       sky.fillRect(0, y, W, 4);
     }
+    EpisodeKit.layer(this, sky, { top: 0, left: 0, right: W });
     EpisodeKit.ridge(this, 0.08, 2, 0x08080c, function (x) { return 150 + Math.sin(x * 0.006) * 40 + Math.sin(x * 0.02) * 12; }, 0.9);
     EpisodeKit.forest(this, 0.25, 3, 0x060608, function () { return H - 130; },
       { gap: 34, minH: 50, maxH: 120, kinds: ['spruce', 'pine'] });
@@ -672,6 +673,13 @@ var Episode5Scene = new Phaser.Class({
         PlayerController.setCheckpoint(s[0] + 20, s[1]);
       }
     }
+  },
+
+  _surfaceAt: function (x, feetY) {
+    if (x < 1600 || (x >= 3950 && x < 4150)) return 'stone';
+    if (Math.abs(x - this.OAK_X) < 150 && feetY < 400) return 'wood';
+    if (x >= 6850 && x < 7750) return 'snow';
+    return 'earth';
   },
 
   update: function (time, delta) {
