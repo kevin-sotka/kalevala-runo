@@ -22,6 +22,9 @@ var RunoGame = new Phaser.Game({
     BootScene,
     TitleScene,
     Episode1Scene,
-    Episode2Scene
+    Episode2Scene,
+    Episode3Scene,
+    Episode4Scene,
+    Episode5Scene
   ]
 });

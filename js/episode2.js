@@ -10,91 +10,52 @@ var Episode2Scene = new Phaser.Class({
   create: function () {
     var W = this.scale.width;
     var H = this.scale.height;
-    this.WORLD_W = 8000;
-    this.WORLD_H = H;
+    EpisodeKit.begin(this, { worldW: 8000, bg: 0x06060a });
     this._driftT = 0;
-    this._finaleTriggered = false;
-    this._playerFrozen = false;
     this._stormActive = false;
     this._stormIntensity = 0;
+    this._sampoActive = false;
     this._sampoProgress = 0;
-    this._sampoCranking = false;
     this._sampoComplete = false;
+    this._crankingNow = false;
     this._sampoSprite = null;
     this._forgeGlowSprite = null;
-    this._vignetteGraphics = null;
-    this._shakeTimer = 0;
-    this._shakeIntensity = 0;
     this._windEmitter = null;
     this._isMobile = !this.sys.game.device.os.desktop;
 
-    this.physics.world.setBounds(0, 0, this.WORLD_W, H + 200);
-    this.cameras.main.setBounds(0, 0, this.WORLD_W, H);
-    this.cameras.main.setBackgroundColor(0x06060a);
-
-    // ── Background / parallax ───────────────────────────────────────
     this._buildParallax(W, H);
-
-    // ── World geometry ──────────────────────────────────────────────
     this._buildWorld(W, H);
-
-    // ── Special entities ────────────────────────────────────────────
     this._buildForge(W, H);
 
-    // ── Player ──────────────────────────────────────────────────────
-    this._player = PlayerController.init(this, 120, H - 80);
-    PlayerController.setCheckpoint(120, H - 80);
-    PlayerController.setSwimMode(false);
+    EpisodeKit.finish(this, {
+      episode: 2,
+      playerX: 120,
+      playerY: H - 80,
+      runes: this._runeDefs(H),
+      opening: {
+        fi: [
+          'Seppo Ilmarinen, taitaja,',
+          'takoja iän-ikuinen,',
+          'kutsuttihin Pohjolahan',
+          'takomahan Sampo uusi.',
+          'Louhi, Pohjolan emäntä,',
+          'lupasi tyttären palkaksi.'
+        ],
+        en: [
+          'Ilmarinen, smith eternal,',
+          'hammerer from days before us,',
+          'was called north to gloomy Pohjola,',
+          'there to forge a Sampo, new-made.',
+          'Louhi, mistress of the Northland,',
+          'pledged her daughter as his payment.'
+        ]
+      }
+    });
 
-    // ── Colliders ───────────────────────────────────────────────────
-    this.physics.add.collider(this._player, this._groundGroup);
-
-    // ── Respawn ─────────────────────────────────────────────────────
-    RespawnSystem.init(this);
-
-    // ── Vignette (storm darkness) ───────────────────────────────────
     this._vignetteGraphics = this.add.graphics();
     this._vignetteGraphics.setScrollFactor(0);
-    this._vignetteGraphics.setDepth(150);
-
-    // ── Rune stones ─────────────────────────────────────────────────
-    this._runes = this._buildRunes(H);
-
-    // ── Camera ──────────────────────────────────────────────────────
-    this.cameras.main.startFollow(this._player, true, 0.08, 0.08);
-    this.cameras.main.setFollowOffset(-80, 0);
-
-    // ── UI ──────────────────────────────────────────────────────────
-    MuteButton.create(this);
+    this._vignetteGraphics.setDepth(80);
     this._buildCrankPrompt(W, H);
-
-    // ── Audio ───────────────────────────────────────────────────────
-    RunoAudio.start(2);
-
-    // ── Camera fade in ──────────────────────────────────────────────
-    this.cameras.main.fadeIn(800, 0, 0, 0);
-
-    // ── Input for story ─────────────────────────────────────────────
-    this.input.on('pointerdown', function () {
-      if (StoryPanel.isActive()) StoryPanel.advance();
-    });
-    this.input.keyboard.on('keydown-ENTER', function () {
-      if (StoryPanel.isActive()) StoryPanel.advance();
-    });
-    this.input.keyboard.on('keydown-SPACE', function () {
-      if (StoryPanel.isActive()) StoryPanel.advance();
-    });
-
-    // Opening verse
-    var self = this;
-    this.time.delayedCall(600, function () {
-      StoryPanel.show(self, [
-        'Ilmarinen, great smith of the north,',
-        'was called to Pohjola to bring forth',
-        'a Sampo — mill of salt, grain, and gold—',
-        'payment for a bride, so it was told.'
-      ], function () {});
-    });
   },
 
   _buildParallax: function (W, H) {
@@ -153,68 +114,28 @@ var Episode2Scene = new Phaser.Class({
   },
 
   _buildWorld: function (W, H) {
-    this._groundGroup = this.physics.add.staticGroup();
-
-    // Ground segments — forge cavern landscape
-    var segments = [
+    EpisodeKit.ground(this, [
       [0, H - 40, 500],
       [500, H - 70, 200],
-      [700, H - 40, 300],
-      [1000, H - 40, 500],
+      [700, H - 40, 800],
       [1500, H - 90, 180],
-      [1680, H - 40, 400],
-      [2080, H - 40, 600],
+      [1680, H - 40, 1000],
       [2680, H - 70, 200],
       [2880, H - 40, 800],
-      // Forge platform
-      [3680, H - 50, 600],
-      [4280, H - 40, 400],
-      [4680, H - 40, 800],  // escape run begins
+      [3680, H - 50, 600],   // the forge floor
+      [4280, H - 40, 1200],  // the escape run begins
       [5480, H - 70, 200],
-      [5680, H - 40, 600],
-      [6280, H - 40, 400],
-      [6680, H - 40, 800],
-      [7480, H - 40, 600]
-    ];
+      [5680, H - 40, 2320]
+    ], { fill: 0x0c0c10, edge: 0x18181e });
 
-    segments.forEach(function (d) {
-      var px = d[0], py = d[1], pw = d[2];
-      var g = this.add.graphics();
-      g.setDepth(7);
-      g.fillStyle(0x0c0c10, 1);
-      g.fillRect(px, py, pw, H - py + 10);
-      g.fillStyle(0x18181e, 1);
-      g.fillRect(px, py, pw, 3);
-      var body = this.physics.add.staticImage(px + pw / 2, py + 1, 'pixel');
-      body.setDisplaySize(pw, 4);
-      body.setAlpha(0);
-      body.refreshBody();
-      this._groundGroup.add(body);
-    }, this);
-
-    // Elevated platforms
-    var platforms = [
+    EpisodeKit.ledges(this, [
       [1200, H - 150, 120],
-      [1600, H - 180, 100],
+      [1600, H - 190, 100],
       [2200, H - 140, 120],
       [3000, H - 160, 100],
       [5000, H - 140, 120],
-      [5600, H - 170, 100]
-    ];
-    platforms.forEach(function (d) {
-      var px = d[0], py = d[1], pw = d[2];
-      var g = this.add.graphics();
-      g.setDepth(7);
-      g.fillStyle(0x0e0e14, 1);
-      g.fillRect(px, py, pw, 12);
-      g.fillStyle(0x1e1e28, 1);
-      g.fillRect(px, py, pw, 3);
-      var body = this.physics.add.staticImage(px + pw / 2, py + 1, 'pixel');
-      body.setDisplaySize(pw, 4);
-      body.setAlpha(0);
-      body.refreshBody();
-      this._groundGroup.add(body);
-    }, this);
+      [5560, H - 170, 100]
+    ], { fill: 0x0e0e14, edge: 0x1e1e28 });
   },
 
   _buildForge: function (W, H) {
@@ -240,88 +161,165 @@ var Episode2Scene = new Phaser.Class({
   _buildCrankPrompt: function (W, H) {
     var promptStyle = {
       fontFamily: "Georgia, serif",
-      fontSize: '13px',
-      color: '#6a5020',
+      fontSize: '14px',
+      color: '#c09040',
       letterSpacing: 2,
-      align: 'center'
+      align: 'center',
+      backgroundColor: 'rgba(8,6,4,0.6)',
+      padding: { x: 10, y: 5 }
     };
-    this._crankPrompt = this.add.text(W / 2, H - 30, 'Hold RIGHT / hold jump to crank the Sampo', promptStyle);
-    this._crankPrompt.setOrigin(0.5, 1);
+    var label = PlayerController.isMobile
+      ? 'Pidä hyppynappia · hold jump to turn the Sampo'
+      : 'Pidä välilyöntiä · hold Space / ↑ to turn the Sampo';
+    this._crankPrompt = this.add.text(W / 2, 64, label, promptStyle);
+    this._crankPrompt.setOrigin(0.5, 0.5);
     this._crankPrompt.setScrollFactor(0);
     this._crankPrompt.setDepth(102);
     this._crankPrompt.setAlpha(0);
   },
 
-  _buildRunes: function (H) {
+  _runeDefs: function (H) {
     var self = this;
-    var verses = [
+    return [
       {
-        id: 'r1', x: 600, y: H - 100,
-        verse: [
-          'Through caverns dark and caverns deep,',
-          "where Pohjola's cold shadows creep,",
-          'the smith walked on with iron will—',
-          'his hammer singing, never still.'
-        ],
-        event: null
+        id: 'r1', x: 600, y: H - 110,
+        verse: {
+          fi: [
+            'Kulki kautta kallioiden,',
+            'halki Pohjan hämäräisen;',
+            'seppo astui, vasara soi,',
+            'rauta rinnassa rämisi.'
+          ],
+          en: [
+            'Through the caverns, through the stone-halls,',
+            'through the northern gloom he wandered;',
+            'on the smith walked, his hammer ringing,',
+            'iron singing in his bosom.'
+          ]
+        }
       },
       {
-        id: 'r2', x: 1500, y: H - 130,
-        verse: [
-          'At the forge the bellows roared and blew,',
-          'three days of fire until iron grew',
-          'into shapes unimagined, turning slow—',
-          'the Sampo rose in amber glow.'
-        ],
+        id: 'r2', x: 1590, y: H - 140,
+        verse: {
+          fi: [
+            'Lietsoivat lietsehet orjat,',
+            'painoivat palkeita väkevät;',
+            'kolme päivää, kolme yötä',
+            'tuli ahjossa tuhisi.',
+            'Katsoi seppo ahjon alle:',
+            'Sampo nousi tulen alta.'
+          ],
+          en: [
+            'Thralls were set to work the bellows,',
+            'strong men pressed and pumped the leather;',
+            'three long days and three long nights through',
+            'roared the fire within the furnace.',
+            'Then the smith looked in the embers:',
+            'from the flame the Sampo, rising.'
+          ]
+        },
         event: function (scene) { self._triggerForgeApproach(scene); }
       },
       {
         id: 'r3_sampo', x: 3900, y: H - 110,
-        verse: [
-          'Here the Sampo turns — grain, salt, and gold,',
-          "a world's abundance, yet to be told.",
-          'Crank the great mill; let it begin.',
-          'Turn, Sampo, turn — let plenty in.'
-        ],
-        event: function (scene) { self._triggerSampoCrank(scene); },
-        isSampoRune: true
+        verse: {
+          fi: [
+            'Jauhoi Sampo, kirjokansi,',
+            'jauhoi purnun puhtehessa:',
+            'yhen purnun syötäviä,',
+            'toisen purnun myötäviä,',
+            'kolmannen kotipitoja.',
+            'Kierrä kirjokantta, kierrä!'
+          ],
+          en: [
+            'Now the Sampo ground, bright-lidded,',
+            'ground a binful at the dusking:',
+            'one bin full of grain for eating,',
+            'one bin full of goods for trading,',
+            'and a third for home and keeping.',
+            'Turn the bright lid, turn the Sampo!'
+          ]
+        },
+        event: function (scene) { self._triggerSampoCrank(scene); }
       },
       {
         id: 'r4', x: 5100, y: H - 100,
-        verse: [
-          'The heroes seized the Sampo in the night,',
-          'sailed swift across the sea in flight.',
-          'But Louhi woke — her voice became the storm.',
-          'Black skies devoured the morning warm.'
-        ],
+        verse: {
+          fi: [
+            'Veivät Sammon venehesen,',
+            'soutivat selälle suurelle.',
+            'Heräsi Pohjolan emäntä,',
+            'nosti myrskyn, nosti tuulen.',
+            'Pimeni taivas, pauhui meri.'
+          ],
+          en: [
+            'Then the heroes stole the Sampo,',
+            'rowed it out upon the broad sea.',
+            'Woke the mistress of the Northland,',
+            'raised a tempest, raised the storm-wind.',
+            'Black the sky grew, roared the ocean.'
+          ]
+        },
         event: function (scene) { self._triggerStorm(scene); }
       },
       {
         id: 'r5', x: 6200, y: H - 100,
-        verse: [
-          'The Sampo struck the rock and broke in three,',
-          'its shards flew wide across the winter sea.',
-          'Fragments that sank would seed the deep—',
-          'those on shore, abundance for man to keep.'
-        ],
+        verse: {
+          fi: [
+            'Kirposi kirjokansi,',
+            'Sampo särkyi kappaleiksi;',
+            'muruset meren sisähän,',
+            'suuret alle aaltojen.',
+            'Ne muruset maalle jäivät:',
+            'siitä kasvu, siitä onni.'
+          ],
+          en: [
+            'Burst apart the bright-lidded Sampo,',
+            'into fragments it was shattered;',
+            'little pieces to the ocean,',
+            'great ones deep beneath the billows.',
+            'Those that drifted to the shoreline:',
+            'from them growth, and from them fortune.'
+          ]
+        },
         event: function (scene) { self._triggerSampoShatter(scene); }
       },
       {
         id: 'r6_finale', x: 7600, y: H - 100,
-        verse: [
-          'The storm grew quiet; the sea lay still.',
-          'Gold light crept up from under the hill.',
-          'The Sampo was gone — yet the world grew green.',
-          'All plenty from what had shattered, unseen.'
-        ],
-        event: function (scene) { self._triggerFinale(scene); },
-        isFinale: true
+        isFinale: true,
+        verse: {
+          fi: [
+            'Tyyntyi myrsky, lepäsi meri,',
+            'päivä nousi kultaisena.',
+            'Vaka vanha Väinämöinen',
+            'kylvi Sammon kappaleita:',
+            '"Siitä kasvu, siitä onni,',
+            'siitä leipä Suomen maalle!"'
+          ],
+          en: [
+            'Stilled the storm; the sea lay sleeping;',
+            'up the sun rose, golden, gleaming.',
+            'Steadfast, old Väinämöinen',
+            'sowed the fragments of the Sampo:',
+            '"Here be growth and here be fortune,',
+            'here be bread for Suomi\'s children!"'
+          ]
+        },
+        event: function (scene) {
+          EpisodeKit.finale(scene, {
+            episode: 2,
+            numeral: 'II',
+            title: { fi: 'Sampo', en: 'The Sampo' },
+            color: '#8a7040',
+            hold: 2200,
+            lines: [
+              { fi: 'Sampo on särkynyt, mutta maa vihannoi.', en: 'The Sampo is broken, yet the land grows green.' },
+              { fi: 'Seuraavaksi: Laulukilpa.', en: 'Next: the Singing Contest.' }
+            ]
+          });
+        }
       }
     ];
-
-    return verses.map(function (v) {
-      return RuneManager.createRune(this, v.x, v.y, v);
-    }, this);
   },
 
   _triggerForgeApproach: function (scene) {
@@ -451,151 +449,26 @@ var Episode2Scene = new Phaser.Class({
     });
   },
 
-  _triggerFinale: function (scene) {
-    if (scene._finaleTriggered) return;
-    scene._finaleTriggered = true;
-    scene._playerFrozen = true;
-
-    scene.time.delayedCall(2200, function () {
-      scene.cameras.main.fadeOut(1500, 0, 0, 0);
-      scene.cameras.main.once('camerafadeoutcomplete', function () {
-        scene._showEndCard(scene);
-      });
-    });
-  },
-
-  _showEndCard: function (scene) {
-    var W = scene.scale.width;
-    var H = scene.scale.height;
-
-    var overlay = scene.add.graphics();
-    overlay.setScrollFactor(0);
-    overlay.setDepth(250);
-    overlay.fillStyle(0x000000, 1);
-    overlay.fillRect(0, 0, W, H);
-
-    scene.cameras.main.resetFX();
-
-    // Gold mote drift
-    try {
-      var emitter = scene.add.particles(W / 2, H * 0.7, 'particle_gold', {
-        x: { min: -W / 2, max: W / 2 },
-        y: { min: 0, max: H },
-        speedX: { min: -10, max: 10 },
-        speedY: { min: -30, max: -6 },
-        scale: { start: 1, end: 0 },
-        alpha: { start: 0.6, end: 0 },
-        lifespan: { min: 3000, max: 7000 },
-        frequency: 160,
-        quantity: 1
-      });
-      emitter.setScrollFactor(0);
-      emitter.setDepth(255);
-    } catch (e) {}
-
-    var titleStyle = {
-      fontFamily: "'Iowan Old Style', Palatino, Georgia, serif",
-      fontSize: '26px',
-      color: '#8a7040',
-      letterSpacing: 8,
-      align: 'center',
-      wordWrap: { width: W - 60 }
-    };
-    var t1 = scene.add.text(W / 2, H / 2 - 80, 'II. The Sampo', titleStyle);
-    t1.setOrigin(0.5, 0.5);
-    t1.setScrollFactor(0);
-    t1.setDepth(260);
-    t1.setAlpha(0);
-
-    var endStyle = {
-      fontFamily: "'Iowan Old Style', Georgia, serif",
-      fontSize: '20px',
-      color: '#6a8060',
-      letterSpacing: 4,
-      align: 'center',
-      wordWrap: { width: W - 60 }
-    };
-    var t2 = scene.add.text(W / 2, H / 2 - 20, 'More runos to come.', endStyle);
-    t2.setOrigin(0.5, 0.5);
-    t2.setScrollFactor(0);
-    t2.setDepth(260);
-    t2.setAlpha(0);
-
-    var subStyle = {
-      fontFamily: "Georgia, serif",
-      fontSize: '13px',
-      color: '#3a4a3a',
-      letterSpacing: 3,
-      align: 'center',
-      wordWrap: { width: W - 60 }
-    };
-    var t3 = scene.add.text(W / 2, H / 2 + 30, 'Lemminkäinen · The Kantele · The Bear Hunt', subStyle);
-    t3.setOrigin(0.5, 0.5);
-    t3.setScrollFactor(0);
-    t3.setDepth(260);
-    t3.setAlpha(0);
-
-    var promptStyle = {
-      fontFamily: "Georgia, serif",
-      fontSize: '13px',
-      color: '#2a3a2a',
-      letterSpacing: 3
-    };
-    var prompt = scene.add.text(W / 2, H - 50, 'tap to return', promptStyle);
-    prompt.setOrigin(0.5, 0.5);
-    prompt.setScrollFactor(0);
-    prompt.setDepth(260);
-    prompt.setAlpha(0);
-
-    scene.tweens.add({ targets: t1, alpha: 1, duration: 1500, delay: 400, ease: 'Sine.easeIn' });
-    scene.tweens.add({ targets: t2, alpha: 1, duration: 1200, delay: 1800, ease: 'Sine.easeIn' });
-    scene.tweens.add({ targets: t3, alpha: 1, duration: 1000, delay: 2600, ease: 'Sine.easeIn' });
-    scene.tweens.add({ targets: prompt, alpha: 1, duration: 1000, delay: 3200, ease: 'Sine.easeIn' });
-
-    scene.time.delayedCall(3500, function () {
-      scene.input.once('pointerdown', function () {
-        scene.cameras.main.fadeOut(600, 0, 0, 0);
-        scene.cameras.main.once('camerafadeoutcomplete', function () {
-          scene.scene.start('TitleScene');
-        });
-      });
-      scene.input.keyboard.once('keydown', function () {
-        scene.cameras.main.fadeOut(600, 0, 0, 0);
-        scene.cameras.main.once('camerafadeoutcomplete', function () {
-          scene.scene.start('TitleScene');
-        });
-      });
-    });
-  },
-
   update: function (time, delta) {
     this._driftT += delta * 0.001;
-
-    if (!this._playerFrozen && !StoryPanel.isActive()) {
-      PlayerController.update(delta, this._groundGroup);
-    }
-
     var player = this._player;
 
-    // Fall / off-world check
-    if (player.y > this.WORLD_H + 80) {
-      RespawnSystem.respawn(player, PlayerController.lastCheckpointX, PlayerController.lastCheckpointY);
-    }
+    // Cranking holds the smith in place: jump turns the mill instead of jumping.
+    var nearForge = Math.abs(player.x - this._forgeX) < 220;
+    this._crankingNow = this._sampoActive && !this._sampoComplete && nearForge &&
+      !StoryPanel.isActive() && PlayerController.input().jump;
+    this._holdPlayer = this._crankingNow;
 
-    // Rune proximity check
-    this._checkRunes(player);
+    EpisodeKit.update(this, delta);
 
-    // Sampo crank mechanic
     if (this._sampoActive && !this._sampoComplete) {
       this._updateSampoCrank(delta, player);
     }
 
-    // Sampo spin
     if (this._sampoSprite && this._sampoProgress > 0) {
       this._sampoSprite.setAngle(this._sampoSprite.angle + delta * 0.08 * (0.5 + this._sampoProgress));
     }
 
-    // Storm / shake
     if (this._stormActive) {
       this._updateStorm(delta);
     } else if (this._stormIntensity > 0) {
@@ -604,35 +477,11 @@ var Episode2Scene = new Phaser.Class({
     }
   },
 
-  _checkRunes: function (player) {
-    var self = this;
-    this._runes.forEach(function (rune) {
-      if (rune.triggered) return;
-      var dx = player.x - rune.x;
-      var dy = player.y - rune.y;
-      var dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < 60) {
-        self._playerFrozen = true;
-        PlayerController.setCheckpoint(rune.x - 40, rune.y);
-        RuneManager.triggerRune(self, rune, function () {
-          self._playerFrozen = false;
-        });
-      }
-      if (!rune.triggered) RuneManager.updateRunePulse(rune, 16);
-    });
-  },
-
   _updateSampoCrank: function (delta, player) {
-    var cursors = PlayerController.cursors;
-    var wasd = PlayerController.wasd;
-    var touchRight = PlayerController.touchRight;
-    var touchJump = PlayerController.touchJump;
-
-    var cranking = cursors.right.isDown || wasd.right.isDown || touchRight || touchJump;
+    var cranking = this._crankingNow;
 
     // Must be near forge
-    var nearForge = Math.abs(player.x - this._forgeX) < 200;
-    if (cranking && nearForge) {
+    if (cranking) {
       this._sampoProgress = Math.min(1, this._sampoProgress + delta * 0.0008);
       this._sampoCranking = true;
 
