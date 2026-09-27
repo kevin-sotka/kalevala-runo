@@ -1,5 +1,7 @@
 # Runo
 
+> Status: v2 adds Runos III to V, buoyant swimming, bilingual verse and saved progress. The live plan is in [PLAN.md](PLAN.md); this document is the original v1 design.
+
 ## Brief (from the prompt)
 - **Concept:** A dark, painterly 2D side-scroller where a stick figure travels through two episodes of the Finnish Kalevala — cold, hushed, lantern-lit, and ancient.
 - **Quality bar:** polished

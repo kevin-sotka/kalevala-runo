@@ -1,6 +1,16 @@
 # Runo
 
-A dark cinematic side-scroller where a stick-figure wanderer travels through two episodes of the Finnish Kalevala—*The Birth of Väinämöinen* and *The Sampo*. Guide your character rightward through procedurally-painted landscapes of cold seas, forge-fire, and ancient storms. Tap glowing runes to hear verses of the story and watch the world respond: eggs crack and birth new mountains; a magical mill spins faster as you crank it; a goddess's storm pursues you across a darkening sky. Every brushstroke—sky gradients, silhouette layers, particle effects, and ambient soundscape—is generated in code. No external art files. Built on Phaser 3, playable in 8–12 minutes per episode.
+A dark, cinematic side-scroller through the *Kalevala*, Finland's national epic. A stick-figure wanderer walks, swims and sings through five songs (runot), each painted entirely in code: cold seas, forge-fire, northern lights over a frozen lake, a midsummer night that never ends, and the long burning road of Kullervo. Touch glowing runes to hear the verses, in Finnish beside English, and watch the world answer. Built on Phaser 3. No external art or audio files.
+
+| | Song | What you do |
+|---|---|---|
+| I | **Väinämöisen synty** · The Birth of Väinämöinen | Float on the first sea; the sotka nests, the eggs break into the world |
+| II | **Sampo** | Walk to the forge, turn the Sampo, flee Louhi's storm |
+| III | **Laulukilpa** · The Singing Contest | Cross the frozen lake, then out-sing Joukahainen into the swamp |
+| IV | **Kantele** · The Pike-Bone Harp | Fight the rapids, fell the great pike, build and play the kantele |
+| V | **Kullervo** · Kalervo's Son | Survive sea, fire and oak; outrun burning Untamola; walk home with Musti |
+
+See **[PLAN.md](PLAN.md)** for what was fixed, why, and what comes next.
 
 ---
 
@@ -25,18 +35,36 @@ Any static server (Node.js `http-server`, Ruby's WEBrick, PHP's built-in server,
 
 ## Controls
 
-**Keyboard:**
-- **Arrow keys** or **WASD** — move left/right, jump (during Episode 1's sea segment, jump becomes a gentle float)
-- **Spacebar** — jump
-- **Enter** — advance story text and trigger narrative beats
-- **M** (or tap **mute toggle** in top-right corner) — toggle audio on/off (audio is off by default)
+**Keyboard**
+- **← → / A D**: walk (and swim)
+- **Space / ↑ / W**: jump. In water, kick up out of the water near the surface. Hold **↓ / S** to dive a little.
+- **Enter / E**: continue a verse once "jatka · continue" shows. Near a lit rune, **E** reads it again.
+- **L**: verse language: Finnish beside English, English only, Finnish only (saved)
+- **M**: sound on/off
+- Episode II: hold **Space** at the Sampo to turn it
+- Episode III: sing back Joukahainen's phrase with **← ↑ → ↓**
+- Episode IV: play the kantele with **1 2 3 4 5** (or A S D F G)
 
-**Touch / Mobile:**
-- **Bottom-left zones** — tap the left or right half of the screen to walk
-- **Bottom-right jump button** — large thumb-friendly button for jumping
-- **Jump button in Episode 2** — doubles as the crank handle for the Sampo mill; hold/tap to spin it
-- **Tap anywhere** — advance story text
-- **Top-right corner** — mute toggle (also works on keyboard)
+**Touch** (landscape)
+- Left third / middle third of the screen: walk left / right
+- Round button, bottom right: jump (and turn the Sampo)
+- Tap to continue a verse; tap a lit rune to read it again
+- Tap the glyph stones (III) and the strings (IV)
+- Top right: **FI · EN** language and sound
+
+Progress and the language choice are saved in the browser. Add `?unlock=all` to the URL to open every song.
+
+---
+
+## Playtest
+
+The game itself needs no build. For the automated playtest (headless Chromium plays every episode to its finale):
+
+```bash
+npm install
+npm run playtest          # all five
+npm run playtest -- 3     # just one
+```
 
 ---
 
@@ -77,15 +105,18 @@ Stories from the *Kalevala*, the Finnish national epic. Built by the SodClaw Gam
 
 ## What's Included
 
-- `index.html` — entry point; loads Phaser 3 from CDN and all game scripts
-- `js/` — game logic and rendering
-  - `audio.js` — WebAudio synthesizer and ambient soundscape
-  - `textures.js` — procedural texture generation (gradients, runes, player, terrain)
-  - `runes.js` — rune stone entities and triggers
-  - `player.js` — stick-figure controller, movement, and checkpoint respawn
-  - `title.js` — title screen and episode select
-  - `episode1.js` — Birth of Väinämöinen scene
-  - `episode2.js` — The Sampo scene
-  - `main.js` — game boot and scene manager
+- `index.html`: entry point; loads Phaser 3 from CDN and the game scripts
+- `js/`
+  - `audio.js`: WebAudio drones, stings, and a synthesized five-string kantele
+  - `textures.js`: BootScene; generates every texture in code
+  - `runes.js`: rune stones, the bilingual verse panel, respawn, save, language and sound buttons
+  - `player.js`: the Wanderer: walking, jumping, buoyant swimming, touch controls
+  - `kit.js`: shared episode building blocks and the silhouette library
+  - `title.js`: title screen and song select
+  - `episode1.js` to `episode5.js`: the five songs
+  - `main.js`: game config and scene list
+- `tools/playtest.mjs`: headless autoplay test (dev only)
+- `PLAN.md`: diagnosis, phases, orchestration plan
+- `gdd.md`: the original game design document
 
-No external dependencies beyond Phaser 3 (loaded from CDN). No build step required.
+Verses: some Finnish lines are Elias Lönnrot's (*Kalevala*, 1849), lightly adapted; the rest are composed in Kalevala meter for the game. The opening English lines follow W. F. Kirby's 1907 translation. Both are in the public domain.
