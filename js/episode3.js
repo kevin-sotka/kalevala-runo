@@ -81,6 +81,7 @@ var Episode3Scene = new Phaser.Class({
       g.fillStyle(0xc8d8ff, 0.2 + Math.random() * 0.6);
       g.fillCircle(Math.random() * W, Math.random() * H * 0.55, Math.random() < 0.15 ? 1.5 : 0.8);
     }
+    EpisodeKit.layer(this, g, { top: 0, left: 0, right: W });
     // Revontulet — the fox's fires
     EpisodeKit.aurora(this, 1, [0x2aa878, 0x2a8aa0, 0x7a50b0]);
   },
@@ -484,6 +485,7 @@ var Episode3Scene = new Phaser.Class({
     var W = this.scale.width, H = this.scale.height;
     var self = this;
     this._holdPlayer = true;
+    RunoAudio.setMusicLevel(0.1);
     this._duel = { round: 0, phase: 'idle', seq: [], pos: 0, misses: 0, rounds: this._roundDefs(), timers: [] };
 
     // Rune stones the player sings with (bottom centre, above touch zones)
@@ -799,12 +801,18 @@ var Episode3Scene = new Phaser.Class({
                 });
                 self._holdPlayer = false;
                 self._duel = null;
+                RunoAudio.setMusicLevel(1);
               });
             });
           });
         });
       });
     });
+  },
+
+  _surfaceAt: function (x, feetY) {
+    var L = this.LAKE;
+    return (x > L.x0 && x < L.x1 && feetY >= L.y - 4) ? 'ice' : 'snow';
   },
 
   update: function (time, delta) {

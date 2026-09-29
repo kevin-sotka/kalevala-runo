@@ -25,6 +25,7 @@ var Episode2Scene = new Phaser.Class({
 
     this._buildParallax(W, H);
     this._buildWorld(W, H);
+    this._buildSea(H);
     this._buildForge(W, H);
 
     EpisodeKit.finish(this, {
@@ -56,6 +57,7 @@ var Episode2Scene = new Phaser.Class({
     this._vignetteGraphics.setScrollFactor(0);
     this._vignetteGraphics.setDepth(80);
     this._buildCrankPrompt(W, H);
+    PlayerController.setWater(this._water);
   },
 
   _buildParallax: function (W, H) {
@@ -73,6 +75,7 @@ var Episode2Scene = new Phaser.Class({
     g1.lineTo(this.WORLD_W + 200, H);
     g1.closePath();
     g1.fillPath();
+    EpisodeKit.layer(this, g1, { top: H - 150, right: this.WORLD_W + 200 });
 
     // Layer 2: mid-ground jagged dark cliffs
     var g2 = this.add.graphics();
@@ -88,6 +91,7 @@ var Episode2Scene = new Phaser.Class({
     g2.lineTo(this.WORLD_W + 100, H);
     g2.closePath();
     g2.fillPath();
+    EpisodeKit.layer(this, g2, { top: H - 90, right: this.WORLD_W + 100 });
 
     // Layer 3: forge warmth glow in mid-ground (amber smear near forge area)
     this._forgeBgGlow = this.add.graphics();
@@ -111,6 +115,7 @@ var Episode2Scene = new Phaser.Class({
       var rw = 30 + Math.random() * 50;
       g4.fillEllipse(rx, H - rh / 2, rw, rh);
     });
+    EpisodeKit.layer(this, g4, { top: H - 100, right: this.WORLD_W });
   },
 
   _buildWorld: function (W, H) {
@@ -123,19 +128,85 @@ var Episode2Scene = new Phaser.Class({
       [2680, H - 70, 200],
       [2880, H - 40, 800],
       [3680, H - 50, 600],   // the forge floor
-      [4280, H - 40, 1200],  // the escape run begins
-      [5480, H - 70, 200],
-      [5680, H - 40, 2320]
+      [4280, H - 40, 700],   // the escape run begins
+      [4980, H - 110, 400],  // the headland above the sea
+      [5560, H - 85, 70],    // rocks in the storm sea
+      [5800, H - 90, 60],
+      [6120, H - 90, 320],   // the rock where the Sampo breaks
+      [6440, H - 40, 1560]
     ], { fill: 0x0c0c10, edge: 0x18181e });
 
     EpisodeKit.ledges(this, [
       [1200, H - 150, 120],
       [1600, H - 190, 100],
       [2200, H - 140, 120],
-      [3000, H - 160, 100],
-      [5000, H - 140, 120],
-      [5560, H - 170, 100]
+      [3000, H - 160, 100]
     ], { fill: 0x0e0e14, edge: 0x1e1e28 });
+  },
+
+  // ── The broad sea the heroes row the Sampo across ─────────────────
+  _buildSea: function (H) {
+    this.SEA = { x0: 5380, x1: 6120, y: H - 70 };
+    this._seaT = 0;
+    this._seaBack = this.add.graphics();
+    this._seaBack.setDepth(6);
+    this._seaFront = this.add.graphics();
+    this._seaFront.setDepth(11);
+
+    // The heroes' boat, the Sampo glowing in it, riding ahead on the swell
+    var boat = this.add.container(5960, this.SEA.y);
+    boat.setDepth(9);
+    var hull = this.add.graphics();
+    Silhouettes.boat(hull, 0, 4, 0.9, 0x1a1210);
+    var glow = this.add.image(0, -14, 'forge_glow').setScale(0.35).setAlpha(0.6);
+    var mill = this.add.image(0, -14, 'sampo').setScale(0.3);
+    boat.add([glow, hull, mill]);
+    this._boat = { c: boat, mill: mill, glow: glow };
+
+    var self = this;
+    PlayerController.setWater(null);
+    this._water = {
+      surfaceAt: function (x) { return (x > self.SEA.x0 && x < self.SEA.x1) ? self._seaY(x) : null; },
+      // Louhi's wind drives the sea back against the Wanderer
+      currentAt: function () { return -48 * self._stormIntensity; }
+    };
+  },
+
+  _seaY: function (x) {
+    var amp = 2 + 7 * this._stormIntensity;
+    return this.SEA.y + Math.sin(x * 0.02 + this._seaT * 2.2) * amp + Math.sin(x * 0.047 - this._seaT * 3.1) * amp * 0.4;
+  },
+
+  _drawSea: function (delta) {
+    this._seaT += delta * 0.001;
+    var S = this.SEA, H = this.scale.height;
+    var b = this._seaBack, f = this._seaFront;
+    b.clear(); f.clear();
+    b.fillStyle(0x06080e, 1);
+    b.fillRect(S.x0, S.y - 12, S.x1 - S.x0, H - S.y + 20);
+    f.fillStyle(0x0c1420, 0.6);
+    f.beginPath();
+    f.moveTo(S.x0, H + 10);
+    for (var x = S.x0; x <= S.x1; x += 10) f.lineTo(x, this._seaY(x) + 2);
+    f.lineTo(S.x1, H + 10);
+    f.closePath();
+    f.fillPath();
+    f.lineStyle(2, 0x3a4a5a, 0.8);
+    f.beginPath();
+    f.moveTo(S.x0, this._seaY(S.x0));
+    for (var x2 = S.x0; x2 <= S.x1; x2 += 10) f.lineTo(x2, this._seaY(x2));
+    f.strokePath();
+    // Whitecaps in the storm
+    if (this._stormIntensity > 0.2) {
+      f.lineStyle(1, 0xc8d0dc, 0.35 * this._stormIntensity);
+      for (var c = S.x0 + ((this._seaT * 90) % 60); c < S.x1; c += 60) {
+        var cy = this._seaY(c);
+        f.lineBetween(c, cy - 1, c + 14, cy + 1);
+      }
+    }
+    var bx = this._boat.c.x;
+    this._boat.c.y = this._seaY(bx);
+    this._boat.c.angle = Math.sin(this._seaT * 2.2 + bx * 0.02) * (3 + 8 * this._stormIntensity);
   },
 
   _buildForge: function (W, H) {
@@ -243,7 +314,7 @@ var Episode2Scene = new Phaser.Class({
         event: function (scene) { self._triggerSampoCrank(scene); }
       },
       {
-        id: 'r4', x: 5100, y: H - 100,
+        id: 'r4', x: 5100, y: H - 160,
         verse: {
           fi: [
             'Veivät Sammon venehesen,',
@@ -263,7 +334,7 @@ var Episode2Scene = new Phaser.Class({
         event: function (scene) { self._triggerStorm(scene); }
       },
       {
-        id: 'r5', x: 6200, y: H - 100,
+        id: 'r5', x: 6200, y: H - 140,
         verse: {
           fi: [
             'Kirposi kirjokansi,',
@@ -422,6 +493,11 @@ var Episode2Scene = new Phaser.Class({
     // Transition sky to dawn (fade in dawn layer)
     scene._showDawnSky(scene);
 
+    // The Sampo is gone from the boat
+    if (scene._boat) {
+      scene.tweens.add({ targets: [scene._boat.mill, scene._boat.glow], alpha: 0, duration: 600 });
+    }
+
     // Stop storm
     scene._stormActive = false;
     scene._stormIntensity = 0;
@@ -449,8 +525,13 @@ var Episode2Scene = new Phaser.Class({
     });
   },
 
+  _surfaceAt: function (x) {
+    return 'stone';
+  },
+
   update: function (time, delta) {
     this._driftT += delta * 0.001;
+    this._drawSea(delta);
     var player = this._player;
 
     // Cranking holds the smith in place: jump turns the mill instead of jumping.
@@ -562,15 +643,16 @@ var Episode2Scene = new Phaser.Class({
 
     // Radial darkness from right edge
     var breathe = 0.85 + Math.sin(this._driftT * 3) * 0.08;
-    var edgeW = W * 0.55 * intensity * breathe;
+    var edgeW = W * 0.4 * intensity * breathe;
 
-    // Right side darkness band
-    for (var i = 0; i < 20; i++) {
-      var t = i / 20;
-      var bandW = edgeW * (1 - t);
-      var alpha = intensity * (1 - t) * 0.85;
-      g.fillStyle(0x000000, alpha);
-      g.fillRect(W - bandW, 0, bandW, H);
+    // Darkness closing in from the right: side-by-side strips that deepen
+    // toward the edge, so the storm sea ahead stays readable
+    var strips = 24;
+    var sw = edgeW / strips;
+    for (var i = 0; i < strips; i++) {
+      var t = (i + 1) / strips;
+      g.fillStyle(0x000000, intensity * 0.8 * Math.pow(t, 1.6));
+      g.fillRect(W - edgeW + i * sw, 0, sw + 1, H);
     }
   }
 });

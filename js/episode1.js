@@ -85,6 +85,7 @@ var Episode1Scene = new Phaser.Class({
       g1.fillStyle(0x0a2040, 0.05 + (y - 200) / 160 * 0.15);
       g1.fillRect(0, y, W * 2, 4);
     }
+    EpisodeKit.layer(this, g1, { top: 200, left: 0, right: W * 2 });
 
     // Distant hills rise on the horizon as the shore draws near
     var hillStart = px(this._seaEnd - 500, 0.15, W);
@@ -102,6 +103,7 @@ var Episode1Scene = new Phaser.Class({
     g2.lineTo(px(this.WORLD_W, 0.15, W) + W, H);
     g2.closePath();
     g2.fillPath();
+    EpisodeKit.layer(this, g2, { top: this._seaSurface - 100, left: hillStart });
 
     // Mid-ground pines behind the shore
     var treeStart = px(this._seaEnd, 0.35, W);
@@ -122,6 +124,7 @@ var Episode1Scene = new Phaser.Class({
       var rh = 20 + Math.random() * 30;
       g4.fillEllipse(X, H - rh / 2, 30 + Math.random() * 20, rh);
     });
+    EpisodeKit.layer(this, g4, { top: H - 60 });
   },
 
   _buildWorld: function (W, H) {
@@ -420,6 +423,10 @@ var Episode1Scene = new Phaser.Class({
       lifespan: { min: 1000, max: 2500 }, gravityY: -30
     });
     EpisodeKit.flash(scene, 0xd4aa44, 0.15, 1500);
+  },
+
+  _surfaceAt: function (x) {
+    return x < this._seaEnd ? 'wood' : 'stone';
   },
 
   update: function (time, delta) {

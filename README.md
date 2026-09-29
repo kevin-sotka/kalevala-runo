@@ -5,7 +5,7 @@ A dark, cinematic side-scroller through the *Kalevala*, Finland's national epic.
 | | Song | What you do |
 |---|---|---|
 | I | **Väinämöisen synty** · The Birth of Väinämöinen | Float on the first sea; the sotka nests, the eggs break into the world |
-| II | **Sampo** | Walk to the forge, turn the Sampo, flee Louhi's storm |
+| II | **Sampo** | Walk to the forge, turn the Sampo, cross the storm sea Louhi raises |
 | III | **Laulukilpa** · The Singing Contest | Cross the frozen lake, then out-sing Joukahainen into the swamp |
 | IV | **Kantele** · The Pike-Bone Harp | Fight the rapids, fell the great pike, build and play the kantele |
 | V | **Kullervo** · Kalervo's Son | Survive sea, fire and oak; outrun burning Untamola; walk home with Musti |
@@ -107,11 +107,11 @@ Stories from the *Kalevala*, the Finnish national epic. Built by the SodClaw Gam
 
 - `index.html`: entry point; loads Phaser 3 from CDN and the game scripts
 - `js/`
-  - `audio.js`: WebAudio drones, stings, and a synthesized five-string kantele
+  - `audio.js`: WebAudio drones, generative kantele music per song, footfalls, stings, and a synthesized five-string kantele
   - `textures.js`: BootScene; generates every texture in code
   - `runes.js`: rune stones, the bilingual verse panel, respawn, save, language and sound buttons
   - `player.js`: the Wanderer: walking, jumping, buoyant swimming, touch controls
-  - `kit.js`: shared episode building blocks and the silhouette library
+  - `kit.js`: shared episode building blocks, layer baking and breathing, and the silhouette library
   - `title.js`: title screen and song select
   - `episode1.js` to `episode5.js`: the five songs
   - `main.js`: game config and scene list

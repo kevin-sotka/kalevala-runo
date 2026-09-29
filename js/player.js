@@ -51,6 +51,9 @@ var PlayerController = {
   _jumping: false,
   _wasInWater: false,
   _touchJumpTap: false,
+  _stepTimer: 0,
+  _wasGrounded: true,
+  _fallSpeed: 0,
 
   init: function (scene, x, y) {
     var P = PlayerController;
@@ -73,6 +76,9 @@ var PlayerController = {
     P._jumping = false;
     P._wasInWater = false;
     P._touchJumpTap = false;
+    P._stepTimer = 0;
+    P._wasGrounded = true;
+    P._fallSpeed = 0;
 
     var sprite = scene.physics.add.sprite(x, y, 'player_stand');
     sprite.setCollideWorldBounds(false);
@@ -268,6 +274,14 @@ var PlayerController = {
     }
     P._wasInWater = inWater;
 
+    // Landing: a heavier footfall after a real fall
+    if (grounded && !P._wasGrounded && P._fallSpeed > 260) {
+      P.footstep(2);
+      P.spawnDust(sprite.x, sprite.y + 18);
+    }
+    P._wasGrounded = grounded;
+    P._fallSpeed = grounded ? 0 : Math.max(0, body.velocity.y);
+
     body.setVelocity(vx, vy);
 
     P._animate(delta, grounded, inWater, vx);
@@ -295,6 +309,11 @@ var PlayerController = {
     }
 
     if (grounded && moving) {
+      P._stepTimer += delta;
+      if (P._stepTimer >= 290) {
+        P._stepTimer = 0;
+        P.footstep(1);
+      }
       P.dustTimer += delta;
       if (P.dustTimer >= 200) {
         P.dustTimer = 0;
@@ -322,7 +341,19 @@ var PlayerController = {
     } catch (e) {}
   },
 
+  // What the Wanderer is standing on; each scene may define _surfaceAt(x, feetY)
+  surface: function () {
+    var P = PlayerController;
+    var fn = P.scene && P.scene._surfaceAt;
+    return fn ? fn.call(P.scene, P.sprite.x, P.sprite.body.bottom) : 'earth';
+  },
+
+  footstep: function (weight) {
+    RunoAudio.playStep(PlayerController.surface(), weight);
+  },
+
   splash: function (x, y) {
+    RunoAudio.playSplash(PlayerController.sprite && PlayerController.sprite.body.velocity.y > 200);
     try {
       var scene = PlayerController.scene;
       var emitter = scene.add.particles(x, y, 'particle_star', {

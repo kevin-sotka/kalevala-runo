@@ -89,6 +89,7 @@ var Episode4Scene = new Phaser.Class({
         Math.floor(a[0] + (b[0] - a[0]) * u), Math.floor(a[1] + (b[1] - a[1]) * u), Math.floor(a[2] + (b[2] - a[2]) * u)), 1);
       g.fillRect(0, y, W, 3);
     }
+    EpisodeKit.layer(this, g, { top: 0, left: 0, right: W });
     // The midnight sun, resting on the horizon and never setting
     var sun = this.add.graphics();
     sun.setScrollFactor(0.02);
@@ -487,6 +488,7 @@ var Episode4Scene = new Phaser.Class({
     this._player.body.setVelocity(0, 0);
     this._player.setFlipX(false);
 
+    RunoAudio.setMusicLevel(0);
     var k = this._kantele = { listen: 0, lastAt: -9999, phase: 'play', next: 0, strings: [] };
 
     // Five strings, one per finger: keys 1–5, A S D F G, or tap
@@ -614,6 +616,7 @@ var Episode4Scene = new Phaser.Class({
     k.strings.forEach(function (s) { fade.push(s.g, s.lab); s.zone.destroy(); });
     this.tweens.add({ targets: fade, alpha: 0, duration: 800 });
     RunoAudio.playKanteleChord([0, 2, 4, 5, 7], 0.18);
+    RunoAudio.setMusicLevel(0.6);
 
     this.time.delayedCall(1600, function () {
       StoryPanel.show(self, {
@@ -727,6 +730,12 @@ var Episode4Scene = new Phaser.Class({
     this._ring.beginPath();
     this._ring.arc(p.x, p.y - 4, 34, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k.listen, false);
     this._ring.strokePath();
+  },
+
+  _surfaceAt: function (x) {
+    if (x > 3400 && x < 3550) return 'wood';
+    if (x > this.RIVER.x0 && x < this.RIVER.x1) return 'stone';
+    return 'earth';
   },
 
   update: function (time, delta) {
